@@ -1,0 +1,71 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.model_selection import train_test_split
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense
+from tensorflow.keras.optimizers import Adam
+
+# Function to create sequences for LSTM
+def create_sequences(data, seq_length):
+    sequences = []
+    for i in range(len(data) - seq_length):
+        sequence = data[i:i + seq_length]
+        sequences.append(sequence)
+    return np.array(sequences)
+
+# Load historical stock price data
+df = pd.read_csv('Amazon.csv')
+
+# Extract the 'Close' price for prediction
+data = df['Close'].values.reshape(-1, 1)
+
+# Normalize the data
+scaler = MinMaxScaler()
+data_normalized = scaler.fit_transform(data)
+
+# Define the sequence length for LSTM
+sequence_length = 10
+
+# Create sequences for LSTM
+sequences = create_sequences(data_normalized, sequence_length)
+
+# Split the data into training and testing sets
+X = sequences[:, :-1]
+y = sequences[:, -1]
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Build the LSTM model
+model = Sequential()
+model.add(LSTM(units=50, activation='relu', input_shape=(X_train.shape[1], X_train.shape[2])))
+model.add(Dense(units=1))
+model.compile(optimizer=Adam(learning_rate=0.001), loss='mean_squared_error')
+
+# Train the model
+history = model.fit(X_train, y_train, epochs=50, batch_size=32, validation_split=0.1, verbose=1)
+
+# Plot the training and validation loss
+plt.plot(history.history['loss'], label='Training Loss')
+plt.plot(history.history['val_loss'], label='Validation Loss')
+plt.legend()
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+plt.title('Training and Validation Loss')
+plt.show()
+
+# Make predictions on the test data
+y_pred = model.predict(X_test)
+
+# Inverse transform the predictions and the actual values
+y_pred_actual = scaler.inverse_transform(y_pred)
+y_test_actual = scaler.inverse_transform(y_test.reshape(-1, 1))
+
+# Plot the actual vs. predicted prices
+plt.plot(y_test_actual, label='Actual Prices')
+plt.plot(y_pred_actual, label='Predicted Prices')
+plt.legend()
+plt.xlabel('Time')
+plt.ylabel('Stock Price')
+plt.title('Actual vs. Predicted Stock Prices')
+plt.show()
